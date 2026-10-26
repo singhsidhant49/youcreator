@@ -383,7 +383,7 @@ export function analyzeVideoQaAudio(
           const boundary = hasPunctuationAfter(i);
           const isAtBoundary = boundary.isSentenceEnd || boundary.isClauseEnd;
           const isTrailingPause =
-            isAtBoundary && startSec >= wStart + 0.08 && overlap / wDur < 0.75;
+            (isAtBoundary || endSec >= wEnd - 0.05) && startSec >= wStart + 0.08 && overlap / wDur < 0.75;
           const isLeadingPause =
             (startSec <= wStart + 0.08 || startSec < wStart) && endSec <= wStart + 0.18 && (wEnd - endSec) > 0.04;
 
