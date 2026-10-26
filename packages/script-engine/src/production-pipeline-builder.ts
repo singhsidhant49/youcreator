@@ -464,6 +464,7 @@ export function createProductionPipeline(
     wordsPerMinute: 135,
     minDurationSeconds: 1.8,
     maxTokensPerRequest: 8192,
+    autoRepairSlots: true,
   });
 
   const storyboardStage = createStoryboardPipelineStage({

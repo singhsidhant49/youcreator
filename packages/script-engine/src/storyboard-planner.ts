@@ -31,6 +31,7 @@ export interface StoryboardPlannerOptions {
   wordsPerMinute?: number;
   minDurationSeconds?: number;
   maxTokensPerRequest?: number;
+  autoRepairSlots?: boolean;
 }
 
 const NormalizedTransitionSchema = z.preprocess((val) => {
@@ -657,31 +658,73 @@ function parseLlmJson(raw: string): unknown {
               scene.shots.map((shot) => shot.slot),
           );
 
-        // 1. If the LLM returned 1-based indices (1, 2, 3...), normalize to 0-based
-        if (
-          rawProposedIndices.length === slots.length &&
-          rawProposedIndices.every((val, idx) => val === idx + 1)
-        ) {
-          for (const scene of candidateProposal.scenes) {
-            for (const shot of scene.shots) {
-              shot.slot -= 1;
+        const allShots = candidateProposal.scenes.flatMap((s) => s.shots);
+
+        if (this.options.autoRepairSlots && allShots.length > 0) {
+          // If the LLM returned fewer shots than slots, append continuation shots to the last scene
+          if (allShots.length < slots.length) {
+            const lastScene = candidateProposal.scenes[candidateProposal.scenes.length - 1]!;
+            const lastShot = allShots[allShots.length - 1]!;
+            while (allShots.length < slots.length) {
+              const nextSlot = allShots.length;
+              const newShot = {
+                ...lastShot,
+                slot: nextSlot,
+                visualRequest: {
+                  ...lastShot.visualRequest,
+                  description: `${lastShot.visualRequest.description} (continued view)`,
+                },
+                motion: lastShot.motion === "slow_zoom_in" ? ("slow_zoom_out" as const) : ("slow_zoom_in" as const),
+                transition: "cut" as const,
+              };
+              lastScene.shots.push(newShot);
+              allShots.push(newShot);
+            }
+          } else if (allShots.length > slots.length) {
+            // If the LLM returned more shots than slots, trim excess shots from the end
+            let count = 0;
+            for (const scene of candidateProposal.scenes) {
+              scene.shots = scene.shots.filter(() => {
+                count++;
+                return count <= slots.length;
+              });
             }
           }
-        }
 
-        // 2. If per-scene reset (e.g. multiple scenes where each scene restarted its shot numbering at 0)
-        if (
-          rawProposedIndices.length === slots.length &&
-          candidateProposal.scenes.length > 1 &&
-          candidateProposal.scenes.every(
-            (scene) => scene.shots.length > 0 && scene.shots[0]!.slot === 0,
-          ) &&
-          !rawProposedIndices.every((val, idx) => val === idx)
-        ) {
+          // Always ensure sequential slot indexing [0, 1, ..., slots.length - 1]
           let globalSlot = 0;
           for (const scene of candidateProposal.scenes) {
             for (const shot of scene.shots) {
               shot.slot = globalSlot++;
+            }
+          }
+        } else {
+          // 1. If the LLM returned 1-based indices (1, 2, 3...), normalize to 0-based
+          if (
+            rawProposedIndices.length === slots.length &&
+            rawProposedIndices.every((val, idx) => val === idx + 1)
+          ) {
+            for (const scene of candidateProposal.scenes) {
+              for (const shot of scene.shots) {
+                shot.slot -= 1;
+              }
+            }
+          }
+
+          // 2. If per-scene reset (e.g. multiple scenes where each scene restarted its shot numbering at 0)
+          if (
+            rawProposedIndices.length === slots.length &&
+            candidateProposal.scenes.length > 1 &&
+            candidateProposal.scenes.every(
+              (scene) => scene.shots.length > 0 && scene.shots[0]!.slot === 0,
+            ) &&
+            !rawProposedIndices.every((val, idx) => val === idx)
+          ) {
+            let globalSlot = 0;
+            for (const scene of candidateProposal.scenes) {
+              for (const shot of scene.shots) {
+                shot.slot = globalSlot++;
+              }
             }
           }
         }
