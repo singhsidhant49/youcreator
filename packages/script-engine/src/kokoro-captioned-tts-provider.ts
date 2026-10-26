@@ -150,15 +150,17 @@ export class KokoroCaptionedTtsProvider {
       this.baseUrl.origin,
     );
 
-    const controller = new AbortController();
+    let response: Response | undefined;
+    let lastError: unknown;
 
-    const timeout = setTimeout(
-      () => controller.abort(),
-      this.timeoutMs,
-    );
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(
+        () => controller.abort(),
+        this.timeoutMs,
+      );
 
-    try {
-      let response: Response;
       try {
         response = await this.http(
           endpoint.href,
@@ -183,30 +185,35 @@ export class KokoroCaptionedTtsProvider {
             redirect: "error",
           },
         );
+        clearTimeout(timeout);
+        if (response.ok) {
+          break;
+        }
       } catch (httpError) {
-        if (
-          process.env.NODE_ENV === "test" &&
-          process.env.ALLOW_TEST_TTS_FIXTURE === "true"
-        ) {
-          return await this.synthesizeWithTestFixture(request);
+        clearTimeout(timeout);
+        lastError = httpError;
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
         }
-        throw new Error(
-          `Kokoro captioned synthesis failed: provider unreachable at ${endpoint.href} (${httpError instanceof Error ? httpError.message : String(httpError)})`,
-        );
       }
+    }
 
-      if (!response.ok) {
-        if (
-          process.env.NODE_ENV === "test" &&
-          process.env.ALLOW_TEST_TTS_FIXTURE === "true" &&
-          response.status >= 500
-        ) {
-          return await this.synthesizeWithTestFixture(request);
-        }
+    if (!response || !response.ok) {
+      if (
+        process.env.NODE_ENV === "test" &&
+        process.env.ALLOW_TEST_TTS_FIXTURE === "true"
+      ) {
+        return await this.synthesizeWithTestFixture(request);
+      }
+      if (!response && lastError) {
         throw new Error(
-          `Kokoro captioned synthesis failed: HTTP ${response.status} from ${endpoint.href}`,
+          `Kokoro captioned synthesis failed: provider unreachable at ${endpoint.href} (${lastError instanceof Error ? lastError.message : String(lastError)})`,
         );
       }
+      throw new Error(
+        `Kokoro captioned synthesis failed: HTTP ${response?.status ?? "unknown"} from ${endpoint.href}`,
+      );
+    }
 
     if (!response.body) {
       throw new Error(
@@ -395,9 +402,6 @@ export class KokoroCaptionedTtsProvider {
         audio,
         alignment,
       };
-    } finally {
-      clearTimeout(timeout);
-    }
   }
 
   private async synthesizeWithTestFixture(
