@@ -499,44 +499,99 @@ function tryRepairTruncatedJson(str: string): unknown {
   return JSON.parse(repaired);
 }
 
+function cleanJsonString(str: string): string {
+  let s = str.trim();
+  const codeBlockMatch = s.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (codeBlockMatch && codeBlockMatch[1]) {
+    s = codeBlockMatch[1].trim();
+  } else {
+    s = s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  }
+
+  const firstBrace = s.indexOf("{");
+  const lastBrace = s.lastIndexOf("}");
+  const firstBracket = s.indexOf("[");
+  const lastBracket = s.lastIndexOf("]");
+
+  if (firstBrace !== -1 && lastBrace > firstBrace && (firstBracket === -1 || firstBrace < firstBracket)) {
+    s = s.slice(firstBrace, lastBrace + 1);
+  } else if (firstBracket !== -1 && lastBracket > firstBracket) {
+    s = s.slice(firstBracket, lastBracket + 1);
+  }
+
+  // Remove single-line comments // ...
+  s = s.replace(/(^|[^:\\])\/\/.*$/gm, "$1");
+  // Remove multi-line comments /* ... */
+  s = s.replace(/\/\*[\s\S]*?\*\//g, "");
+  // Remove trailing commas before } or ]
+  s = s.replace(/,(\s*[\]}])/g, "$1").replace(/,(\s*[\]}])/g, "$1");
+
+  return s;
+}
+
 function parseLlmJson(raw: string): unknown {
   try {
     return JSON.parse(raw);
   } catch {
-    let cleaned = raw.trim();
-    if (cleaned.startsWith("```")) {
-      cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-      try {
-        return JSON.parse(cleaned);
-      } catch {
-        // continue
-      }
-    }
-    const firstBrace = cleaned.indexOf("{");
-    const lastBrace = cleaned.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      try {
-        return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
-      } catch {
-        // continue
-      }
-    }
-    const firstBracket = cleaned.indexOf("[");
-    const lastBracket = cleaned.lastIndexOf("]");
-    if (firstBracket !== -1 && lastBracket > firstBracket) {
-      try {
-        return JSON.parse(cleaned.slice(firstBracket, lastBracket + 1));
-      } catch {
-        // continue
-      }
-    }
+    const cleaned = cleanJsonString(raw);
     try {
-      return tryRepairTruncatedJson(cleaned);
+      return JSON.parse(cleaned);
     } catch {
-      // continue
+      const sanitized = cleaned.replace(/,\s*([\]}])/g, "$1").replace(/,\s*([\]}])/g, "$1");
+      try {
+        return JSON.parse(sanitized);
+      } catch {
+        try {
+          return tryRepairTruncatedJson(sanitized);
+        } catch {
+          try {
+            return tryRepairTruncatedJson(cleaned);
+          } catch {
+            throw new Error("Invalid JSON");
+          }
+        }
+      }
     }
-    throw new Error("Invalid JSON");
   }
+}
+
+function createFallbackSegmentPlan(
+  segment: { id: string; text: string },
+  slots: Array<{ index: number; narrationText: string }>,
+  beatInfo: { beat: string; objective: string; visualIntent: string },
+): z.infer<typeof LLMPlanSchema> {
+  const shots = slots.map((slot) => {
+    const words = slot.narrationText
+      .replace(/[^\w\s]/gu, "")
+      .trim()
+      .split(/\s+/u)
+      .filter((w) => w.length >= 3);
+    const searchQueries = words.length > 0
+      ? [words.slice(0, 3).join(" "), words.slice(-3).join(" ")].filter((q) => q.length >= 3)
+      : ["cinematic visual", "documentary footage"];
+
+    return {
+      slot: slot.index,
+      visualRequest: {
+        description: `Cinematic high-definition documentary footage depicting: ${slot.narrationText.slice(0, 100)}`,
+        searchQueries: searchQueries.length > 0 ? searchQueries : ["cinematic footage"],
+        negativeTerms: [],
+        intent: "illustration" as const,
+        preferredMediaKind: "either" as const,
+      },
+      motion: slot.index % 2 === 0 ? ("slow_zoom_in" as const) : ("slow_zoom_out" as const),
+      transition: "cut" as const,
+    };
+  });
+
+  return {
+    scenes: [
+      {
+        purpose: beatInfo.visualIntent || `Visual progression for ${segment.id}`,
+        shots,
+      },
+    ],
+  };
 }
 
       let proposal: z.infer<typeof LLMPlanSchema> | undefined;
@@ -630,11 +685,17 @@ function parseLlmJson(raw: string): unknown {
           },
         );
 
+        let candidateProposal: z.infer<typeof LLMPlanSchema>;
         let parsed: unknown;
         try {
           parsed = parseLlmJson(response.text);
         } catch {
           if (attempt === 2) {
+            if (this.options.autoRepairSlots) {
+              candidateProposal = createFallbackSegmentPlan(segment, slots, beatInfo);
+              proposal = candidateProposal;
+              break;
+            }
             throw new Error(
               `Storyboard LLM returned invalid JSON for ${segment.id}`,
             );
@@ -642,11 +703,15 @@ function parseLlmJson(raw: string): unknown {
           continue;
         }
 
-        let candidateProposal: z.infer<typeof LLMPlanSchema>;
         try {
           candidateProposal = LLMPlanSchema.parse(parsed);
         } catch (schemaErr) {
           if (attempt === 2) {
+            if (this.options.autoRepairSlots) {
+              candidateProposal = createFallbackSegmentPlan(segment, slots, beatInfo);
+              proposal = candidateProposal;
+              break;
+            }
             throw schemaErr;
           }
           continue;
@@ -754,9 +819,13 @@ function parseLlmJson(raw: string): unknown {
 
 
       if (!proposal) {
-        throw new Error(
-          `Storyboard LLM failed to produce valid plan for ${segment.id}`,
-        );
+        if (this.options.autoRepairSlots) {
+          proposal = createFallbackSegmentPlan(segment, slots, beatInfo);
+        } else {
+          throw new Error(
+            `Storyboard LLM failed to produce valid plan for ${segment.id}`,
+          );
+        }
       }
 
       sections.push({
