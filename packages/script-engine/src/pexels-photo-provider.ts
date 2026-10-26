@@ -289,9 +289,17 @@ export class PexelsPhotoProvider
 
         seenIds.add(photo.id);
 
-        const description =
-          photo.alt?.trim() ||
-          query;
+        const altTokens = photo.alt
+          ? photo.alt.toLowerCase().replace(/[^a-z0-9\s]/gu, " ").split(/\s+/u).filter((w) => w.length > 2)
+          : [];
+        const rawSlug = photo.url
+          ? (photo.url.split("/photo/")[1] || "").split("/")[0]?.replace(/-\d+$/u, "").replace(/-/gu, " ")
+          : "";
+        const slugTokens = rawSlug
+          ? rawSlug.toLowerCase().replace(/[^a-z0-9\s]/gu, " ").split(/\s+/u).filter((w) => w.length > 2)
+          : [];
+        const realKeywords = [...new Set([...altTokens, ...slugTokens, query.toLowerCase()])];
+        const description = photo.alt?.trim() || rawSlug || query;
 
         candidates.push({
           id: `pexels-photo-${photo.id}`,
@@ -312,7 +320,7 @@ export class PexelsPhotoProvider
           width: photo.width,
           height: photo.height,
 
-          keywords: [query, ...requirement.searchQueries],
+          keywords: realKeywords,
           providerScore: 1.0,
 
           licenseName: "Pexels License",

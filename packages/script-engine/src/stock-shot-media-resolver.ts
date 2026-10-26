@@ -232,19 +232,29 @@ export class StockShotMediaResolver
       }
 
       if (!bestSelection || bestSelection.status !== "selected") {
-        const broadWords = requirement.description
-          .replace(/[^\w\s]/gu, "")
+        const stopWords = new Set([
+          "with", "from", "that", "this", "these", "those", "into", "onto",
+          "under", "over", "about", "style", "shot", "beside", "showing",
+          "revealing", "faint", "crisp", "lone", "slow", "fast", "view",
+        ]);
+        const cleanWords = requirement.description
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/gu, " ")
           .split(/\s+/u)
-          .filter((w) => w.length >= 4)
-          .slice(0, 3)
-          .join(" ");
+          .filter((w) => w.length >= 4 && !stopWords.has(w));
+
+        const broadPhrase = cleanWords.slice(0, 2).join(" ");
+        const firstQuery = requirement.searchQueries[0];
+        const simplifiedQuery = firstQuery
+          ? firstQuery.split(/\s+/u).slice(0, 2).join(" ")
+          : "";
 
         const fallbackQueries = [
-          broadWords,
-          "underwater ocean",
-          "deep sea",
-          "nature cinematic",
-        ].filter(Boolean);
+          simplifiedQuery,
+          broadPhrase,
+          cleanWords[0],
+          cleanWords[1],
+        ].filter((q): q is string => Boolean(q && q.trim().length >= 3));
 
         for (const fbQuery of fallbackQueries) {
           const fallbackDiscovery = await this.options.discovery.discover(

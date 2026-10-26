@@ -193,6 +193,10 @@ function relevanceScore(
     candidate,
   );
 
+  if (lexical === 0) {
+    return 0;
+  }
+
   if (candidate.providerScore === undefined) {
     return lexical;
   }
@@ -401,9 +405,10 @@ export class MediaCandidateSelector {
         // P0 Semantic Gate evaluation
         let semanticGateResult: SemanticGateResult | undefined;
         let rejectedBySemanticGate = false;
+        let evidence: SemanticCandidateEvidence | undefined;
 
         if (context.semanticRequirement) {
-          const evidence =
+          evidence =
             context.semanticEvidence?.[candidate.id] ??
             context.semanticEvidence?.[candidateKey] ??
             (candidate as any).semanticEvidence;
@@ -448,8 +453,16 @@ export class MediaCandidateSelector {
           candidate,
         );
 
+        const semanticRelevance = semanticGateResult && semanticGateResult.accepted && evidence
+          ? (evidence.relevanceScore / 100)
+          : undefined;
+
+        const effectiveRelevance = semanticRelevance !== undefined
+          ? Math.max(relevance, semanticRelevance)
+          : relevance;
+
         const baseScore =
-          relevance * this.policy.relevanceWeight +
+          effectiveRelevance * this.policy.relevanceWeight +
           aspect * this.policy.aspectRatioWeight +
           source * this.policy.sourcePreferenceWeight;
 
@@ -477,7 +490,7 @@ export class MediaCandidateSelector {
 
         return {
           candidate,
-          relevanceScore: relevance,
+          relevanceScore: effectiveRelevance,
           aspectRatioScore: aspect,
           sourcePreferenceScore: source,
           repeatedAsset,
@@ -517,10 +530,11 @@ export class MediaCandidateSelector {
       };
     }
 
-    // Look for candidates that passed semantic gate and meet minimum score
+    // Look for candidates that passed semantic gate, meet minimum score, and have non-zero relevance
     const acceptable = ranked.filter(
       (item) =>
         (!item.semanticGateResult || item.semanticGateResult.accepted) &&
+        item.relevanceScore > 0 &&
         item.finalScore >= this.policy.minimumScore,
     );
 
