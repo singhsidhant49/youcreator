@@ -74,7 +74,7 @@ Instructions:
 - Avoid generic filler and robotic phrasing.
 - Do not include image prompts or camera directions.
 - Avoid inventing facts, statistics or quotations.
-- Aim for the requested word count.
+- Aim for the requested word count. Write detailed, vivid narration meeting or slightly exceeding the TARGET WORDS count (write at least ${section.targetWords} words; do not summarize or write too briefly).
 - Return only valid JSON.
 
 JSON format:

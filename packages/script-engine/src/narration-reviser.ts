@@ -101,7 +101,7 @@ export class NarrationReviser {
             content: `
 Revise the following narration.
 
-Goal: ${direction} the narration to approximately ${targetWords} words.
+Goal: ${direction} the narration to ${targetWords} words (aim for at least ${targetWords} words if expanding).
 
 Language: ${language}
 Tone: ${tone}
@@ -117,6 +117,7 @@ Requirements:
 - Preserve relevant factual information.
 - Improve clarity and natural spoken flow.
 - Avoid repetition, filler and invented facts.
+- Spell out all numbers, symbols, and abbreviations as full spoken English words.
 - Do not add camera directions or image prompts.
 - Do not introduce unsupported statistics.
 - Return the entire revised narration.

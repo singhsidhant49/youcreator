@@ -271,6 +271,8 @@ Instructions:
 ${instructions}
 
 Target words: ${targetWords}
+Write detailed, natural spoken narration meeting or slightly exceeding ${targetWords} words. Do not summarize or write too briefly.
+Spell out all numbers, symbols, and abbreviations as full spoken English words.
 
 Return JSON:
 {"narration":"Complete spoken narration"}

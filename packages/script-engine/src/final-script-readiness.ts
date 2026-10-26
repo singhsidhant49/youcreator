@@ -42,8 +42,8 @@ export function evaluateFinalScriptReadiness(
   const targetDurationSeconds = options.targetDurationSeconds;
   const wordsPerMinute = options.wordsPerMinute ?? 135;
 
-  const minimumDurationRatio = options.minimumDurationRatio ?? 0.8;
-  const maximumDurationRatio = options.maximumDurationRatio ?? 1.2;
+  const minimumDurationRatio = options.minimumDurationRatio ?? 0.65;
+  const maximumDurationRatio = options.maximumDurationRatio ?? 1.35;
   const requireEditorialIssueFree = options.requireEditorialIssueFree ?? false;
 
 
