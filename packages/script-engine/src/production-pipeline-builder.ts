@@ -440,8 +440,8 @@ export function createProductionPipeline(
     readiness: {
       enabled: true,
       policy: {
-        minimumDurationRatio: 0.65,
-        maximumDurationRatio: 1.35,
+        minimumDurationRatio: 0.50,
+        maximumDurationRatio: 1.50,
       },
     },
   });
