@@ -755,6 +755,9 @@ function createFallbackSegmentPlan(
                 return count <= slots.length;
               });
             }
+            candidateProposal.scenes = candidateProposal.scenes.filter(
+              (scene) => scene.shots.length > 0,
+            );
           }
 
           // Always ensure sequential slot indexing [0, 1, ..., slots.length - 1]
@@ -795,6 +798,10 @@ function createFallbackSegmentPlan(
           }
         }
 
+        candidateProposal.scenes = candidateProposal.scenes.filter(
+          (scene) => scene.shots.length > 0,
+        );
+
         const proposedIndices =
           candidateProposal.scenes.flatMap(
             (scene) =>
@@ -817,8 +824,6 @@ function createFallbackSegmentPlan(
         break;
       }
 
-
-
       if (!proposal) {
         if (this.options.autoRepairSlots) {
           proposal = createFallbackSegmentPlan(segment, slots, beatInfo);
@@ -827,6 +832,15 @@ function createFallbackSegmentPlan(
             `Storyboard LLM failed to produce valid plan for ${segment.id}`,
           );
         }
+      }
+
+      // Ensure no scenes are empty of shots before assembling sections
+      proposal.scenes = proposal.scenes.filter(
+        (scene) => scene.shots && scene.shots.length > 0,
+      );
+
+      if (proposal.scenes.length === 0) {
+        proposal = createFallbackSegmentPlan(segment, slots, beatInfo);
       }
 
       sections.push({
