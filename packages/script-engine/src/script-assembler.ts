@@ -66,6 +66,7 @@ export interface ScriptAssemblerOptions {
   minWordRatio?: number;
   maxWordRatio?: number;
 
+  outlineTolerance?: number;
   reviseSections?: boolean;
   maxRevisionCalls?: number;
   revisionTolerance?: number;
@@ -97,7 +98,7 @@ export class ScriptAssembler {
   ) {
     this.planner = new OutlinePlanner(llm, {
       narrativePlan: options.narrativePlan,
-      tolerance: options.revisionTolerance ?? 0.15,
+      tolerance: options.outlineTolerance ?? 0.25,
     });
     this.writer = new SectionWriter(llm);
 
