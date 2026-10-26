@@ -232,6 +232,52 @@ export class StockShotMediaResolver
       }
 
       if (!bestSelection || bestSelection.status !== "selected") {
+        const broadWords = requirement.description
+          .replace(/[^\w\s]/gu, "")
+          .split(/\s+/u)
+          .filter((w) => w.length >= 4)
+          .slice(0, 3)
+          .join(" ");
+
+        const fallbackQueries = [
+          broadWords,
+          "underwater ocean",
+          "deep sea",
+          "nature cinematic",
+        ].filter(Boolean);
+
+        for (const fbQuery of fallbackQueries) {
+          const fallbackDiscovery = await this.options.discovery.discover(
+            {
+              ...requirement,
+              searchQueries: [fbQuery],
+              preferredMediaKind: "either",
+            },
+            {
+              jobId: this.options.jobId,
+              mode: this.mode,
+            },
+          );
+
+          if (fallbackDiscovery.status === "candidates_found" && fallbackDiscovery.candidates.length > 0) {
+            mergeCandidates(fallbackDiscovery.candidates);
+            const fbSelection = this.options.selector.select(
+              requirement,
+              fallbackDiscovery,
+              {
+                previouslySelectedAssetKeys: this.usedKeys,
+                targetStyle: this.options.targetStyle,
+              },
+            );
+            if (fbSelection.status === "selected") {
+              bestSelection = fbSelection;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!bestSelection || bestSelection.status !== "selected") {
         if (this.options.authorizedFallbackAsset) {
           return {
             status: "assigned",

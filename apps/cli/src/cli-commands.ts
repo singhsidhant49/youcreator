@@ -312,6 +312,8 @@ export async function handleRun(
 
   const system = createProductionPipeline({
     outputRoot,
+    visualMode: (job.config.canonicalMode ?? job.config.mode) as any,
+    visualModeVersion: job.config.version ?? 2,
     deepseekApiKey: process.env.DEEPSEEK_API_KEY,
     deepseekModel: process.env.DEEPSEEK_MODEL,
     pexelsApiKey: process.env.PEXELS_API_KEY,
@@ -384,6 +386,8 @@ export async function handleResume(
 
   const system = createProductionPipeline({
     outputRoot,
+    visualMode: (job.config.canonicalMode ?? job.config.mode) as any,
+    visualModeVersion: job.config.version ?? 2,
     deepseekApiKey: process.env.DEEPSEEK_API_KEY,
     deepseekModel: process.env.DEEPSEEK_MODEL,
     pexelsApiKey: process.env.PEXELS_API_KEY,

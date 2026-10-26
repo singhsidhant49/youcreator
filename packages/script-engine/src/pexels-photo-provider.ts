@@ -109,6 +109,19 @@ export class PexelsPhotoProvider
 
   private readonly httpClient: PexelsHttpClient;
 
+  private readonly isMocked: boolean;
+  private readonly queryCache = new Map<string, MediaCandidate[]>();
+  private static lastRequestTimestamp = 0;
+
+  private static async paceRequest(minIntervalMs = 350): Promise<void> {
+    const now = Date.now();
+    const elapsed = now - PexelsPhotoProvider.lastRequestTimestamp;
+    if (elapsed < minIntervalMs) {
+      await new Promise((resolve) => setTimeout(resolve, minIntervalMs - elapsed));
+    }
+    PexelsPhotoProvider.lastRequestTimestamp = Date.now();
+  }
+
   constructor(options: PexelsPhotoProviderOptions) {
     const validated = PexelsOptionsSchema.parse({
       apiKey: options.apiKey,
@@ -119,6 +132,7 @@ export class PexelsPhotoProvider
     this.apiKey = validated.apiKey;
     this.perPage = validated.perPage;
     this.orientation = validated.orientation;
+    this.isMocked = Boolean(options.httpClient);
     this.httpClient =
       options.httpClient ?? defaultHttpClient;
   }
@@ -175,6 +189,24 @@ export class PexelsPhotoProvider
     const seenIds = new Set<number>();
 
     for (const query of queries) {
+      const cacheKey = `${query.toLowerCase().trim()}:${limit}:${this.orientation}`;
+      if (!this.isMocked && this.queryCache.has(cacheKey)) {
+        const cached = this.queryCache.get(cacheKey)!;
+        for (const c of cached) {
+          const numId = Number(c.providerAssetId);
+          if (!seenIds.has(numId)) {
+            seenIds.add(numId);
+            candidates.push(c);
+          }
+        }
+        if (candidates.length >= limit) {
+          break;
+        }
+        if (candidates.length > 0) {
+          continue;
+        }
+      }
+
       const url = new URL(ENDPOINT);
 
       url.searchParams.set("query", query.slice(0, 160).trim());
@@ -188,18 +220,52 @@ export class PexelsPhotoProvider
         this.orientation,
       );
 
-      const response = await this.httpClient(
-        url.toString(),
-        {
-          headers: {
-            Authorization: this.apiKey,
-          },
-        },
-      );
+      let response: PexelsHttpResponse | undefined;
+      let lastError: Error | undefined;
 
-      if (!response.ok) {
+      const maxAttempts = this.isMocked ? 1 : 4;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        if (!this.isMocked) {
+          await PexelsPhotoProvider.paceRequest(350);
+        }
+        try {
+          response = await this.httpClient(
+            url.toString(),
+            {
+              headers: {
+                Authorization: this.apiKey,
+              },
+            },
+          );
+
+          if (!this.isMocked) {
+            if (response.status === 429) {
+              const delay = Math.min(10000, 1500 * Math.pow(2, attempt - 1));
+              await new Promise((resolve) => setTimeout(resolve, delay));
+              continue;
+            }
+
+            if (response.status >= 500) {
+              const delay = 1000 * attempt;
+              await new Promise((resolve) => setTimeout(resolve, delay));
+              continue;
+            }
+          }
+
+          break;
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+          if (!this.isMocked && attempt < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+          }
+        }
+      }
+
+      if (!response || !response.ok) {
+        if (lastError) throw lastError;
         throw new Error(
-          `Pexels photo search failed with HTTP ${response.status}`,
+          `Pexels photo search failed with HTTP ${response?.status ?? "unknown"}`,
         );
       }
 
@@ -266,6 +332,9 @@ export class PexelsPhotoProvider
       }
 
       if (candidates.length > 0) {
+        if (!this.isMocked) {
+          this.queryCache.set(cacheKey, candidates);
+        }
         break;
       }
     }
