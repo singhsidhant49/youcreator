@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build Outputs
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Environment variables (CRITICAL: NEVER PUSH SECRETS TO PUBLIC REPO)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Generated Output & Media (Large binary files, exports, bundles)
+output/
+storage/jobs/*
+!storage/jobs/.gitkeep
+storage/assets/*
+!storage/assets/.gitkeep
+*.mp4
+*.wav
+
+# Scratch & Temporary
+scratch/
+.tempmediaStorage/
+tmp/
+temp/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -1,0 +1,16 @@
+{
+  "name": "@youcreator/script-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@youcreator/contracts": "0.1.0",
+    "@youcreator/core": "0.1.0",
+    "@youcreator/llm": "0.1.0",
+    "sharp": "^0.35.5",
+    "zod": "^4.0.0"
+  }
+}

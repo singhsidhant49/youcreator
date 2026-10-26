@@ -1,0 +1,12 @@
+{
+  "name": "@youcreator/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@youcreator/core": "0.1.0",
+    "@youcreator/llm": "0.1.0",
+    "@youcreator/script-engine": "0.1.0",
+    "@youcreator/shared": "0.1.0"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "category": "technology",
+  "images": [
+    {
+      "id": "tech-001",
+      "file": "images/developer-desk.jpg",
+      "description": "Software developer working at a laptop in a modern office",
+      "tags": ["developer", "programming", "laptop", "office"],
+      "keywords": ["software engineering", "coding", "computer"],
+      "width": 1920,
+      "height": 1080,
+      "license": {
+        "name": "internal-review-required"
+      }
+    },
+    {
+      "id": "tech-002",
+      "file": "images/server-room.jpg",
+      "description": "Rows of computer servers inside a modern data center",
+      "tags": ["server", "datacenter", "cloud", "infrastructure"],
+      "keywords": ["server room", "computing", "network"],
+      "width": 1920,
+      "height": 1080
+    }
+  ]
+}
